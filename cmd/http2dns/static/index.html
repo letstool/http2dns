@@ -1,0 +1,1803 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/png" sizes="512x512" href="/favicon.png">
+<title>DNS Query — CERT</title>
+<style>
+  /* ── THEMES ── */
+  :root {
+    --bg:             #0a0e14;
+    --surface:        #0f1520;
+    --border:         #1e2d45;
+    --border-hi:      #2a4060;
+    --accent:         #00d4ff;
+    --accent2:        #0090cc;
+    --accent-dim:     #003a52;
+    --text:           #c8d8e8;
+    --text-dim:       #4a6480;
+    --text-mid:       #7a9ab8;
+    --ok:             #00b87a;
+    --ok-dim:         #003d2a;
+    --warn:           #ffb340;
+    --warn-dim:       #3d2a00;
+    --err:            #ff4e6a;
+    --err-dim:        #3d0010;
+    --grid-a:         rgba(30,45,69,0.30);
+    --grid-b:         rgba(30,45,69,0.15);
+    --radial:         rgba(0,180,255,0.07);
+    --panel-tint:     rgba(0,212,255,0.04);
+    --select-opt-bg:  #0f1520;
+    --raw-bg:         #070b10;
+    --focus-ring:     #00d4ff;
+    --mono: 'Courier New', 'Lucida Console', monospace;
+    --sans: system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
+  }
+
+  [data-theme="light"] {
+    --bg:             #eef3f9;
+    --surface:        #ffffff;
+    --border:         #c8d8ec;
+    --border-hi:      #a0bcd8;
+    --accent:         #0070a0;
+    --accent2:        #005278;
+    --accent-dim:     #d4eaf8;
+    --text:           #152030;
+    --text-dim:       #7898b8;
+    --text-mid:       #3a6080;
+    --ok:             #006e48;
+    --ok-dim:         #d0f0e4;
+    --warn:           #8c5200;
+    --warn-dim:       #fff0d0;
+    --err:            #b0002a;
+    --err-dim:        #fde8ef;
+    --grid-a:         rgba(150,190,225,0.28);
+    --grid-b:         rgba(150,190,225,0.14);
+    --radial:         rgba(0,120,180,0.06);
+    --panel-tint:     rgba(0,112,160,0.04);
+    --select-opt-bg:  #ffffff;
+    --raw-bg:         #f4f8fc;
+    --focus-ring:     #005278;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* ── SKIP LINK (accessibilité) ── */
+  .skip-link {
+    position: absolute;
+    top: -100px;
+    left: 16px;
+    z-index: 9999;
+    background: var(--accent);
+    color: var(--bg);
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    font-weight: 700;
+    padding: 10px 18px;
+    border-radius: 0 0 6px 6px;
+    text-decoration: none;
+    letter-spacing: 0.08em;
+    transition: top 0.2s;
+  }
+  .skip-link:focus {
+    top: 0;
+    outline: 3px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  /* ── FOCUS VISIBLE global ── */
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 3px;
+    border-radius: 3px;
+  }
+  /* Supprimer l'outline natif uniquement quand on applique le nôtre */
+  :focus:not(:focus-visible) { outline: none; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 16px 60px;
+    background-image:
+      radial-gradient(ellipse 80% 40% at 50% -10%, var(--radial) 0%, transparent 70%),
+      repeating-linear-gradient(0deg,  transparent, transparent 39px, var(--grid-a) 40px),
+      repeating-linear-gradient(90deg, transparent, transparent 39px, var(--grid-b) 40px);
+    transition: background 0.3s, color 0.3s;
+  }
+
+  /* ── RTL support ── */
+  [dir="rtl"] .panel-head::before { margin-left: 10px; margin-right: 0; }
+  [dir="rtl"] .lang-arrow         { left: 8px; right: auto; }
+  [dir="rtl"] .lang-select        { padding: 5px 10px 5px 26px; }
+  [dir="rtl"] select              {
+    background-position: left 12px center;
+    padding-left: 32px; padding-right: 12px;
+  }
+  [dir="rtl"] .result-time        { margin-left: 0; margin-right: auto; }
+  [dir="rtl"] .theme-toggle       { flex-direction: row-reverse; }
+
+  /* ── HEADER ── */
+  header {
+    width: 100%; max-width: 900px;
+    padding: 32px 0 24px;
+    display: flex; align-items: center; gap: 16px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 32px;
+    transition: border-color 0.3s;
+  }
+
+  .logo-shield { width: 38px; height: 42px; flex-shrink: 0; }
+  .logo-shield path   { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-linejoin: round; transition: stroke 0.3s; }
+  .logo-shield circle { fill: var(--accent); opacity: 0.9; transition: fill 0.3s; }
+  .logo-shield line   { stroke: var(--accent); stroke-width: 1.5; stroke-linecap: round; transition: stroke 0.3s; }
+
+  .header-text h1 {
+    font-family: var(--mono);
+    font-size: 1.05rem; font-weight: 600;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--accent); transition: color 0.3s;
+  }
+  .header-text p {
+    font-size: 0.68rem; font-weight: 400;
+    color: var(--text-dim); letter-spacing: 0.07em;
+    text-transform: uppercase; margin-top: 3px;
+    transition: color 0.3s;
+  }
+
+  .header-right {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 10px;
+    flex-shrink: 0;
+  }
+
+  /* ── THEME TOGGLE ── */
+  .theme-toggle {
+    display: flex; align-items: center; gap: 7px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: transparent; border-radius: 20px;
+    padding: 5px 11px 5px 8px;
+    transition: border-color 0.2s, background 0.2s, color 0.2s;
+    color: var(--text-dim);
+  }
+  .theme-toggle:hover,
+  .theme-toggle:focus-visible {
+    border-color: var(--accent2); background: var(--accent-dim); color: var(--accent);
+  }
+  .theme-icon { font-size: 0.85rem; line-height: 1; transition: transform 0.4s; }
+  .theme-toggle:hover .theme-icon { transform: rotate(20deg); }
+  .theme-track {
+    width: 28px; height: 15px;
+    background: var(--border); border-radius: 8px;
+    position: relative; flex-shrink: 0; transition: background 0.3s;
+  }
+  .theme-thumb {
+    position: absolute; top: 2px; left: 2px;
+    width: 11px; height: 11px; border-radius: 50%;
+    background: var(--text-dim);
+    transition: transform 0.3s, background 0.3s;
+  }
+  [data-theme="light"] .theme-track { background: var(--accent2); }
+  [data-theme="light"] .theme-thumb { background: #fff; transform: translateX(13px); }
+  .theme-label {
+    font-family: var(--mono); font-size: 0.6rem;
+    letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap;
+  }
+
+  /* ── LANGUAGE SELECTOR ── */
+  .lang-select-wrap {
+    position: relative;
+    display: flex; align-items: center;
+  }
+  .lang-select {
+    appearance: none; -webkit-appearance: none;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    padding: 5px 26px 5px 10px;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s, background 0.2s, color 0.2s;
+    width: auto;
+  }
+  .lang-select:hover, .lang-select:focus-visible {
+    border-color: var(--accent2);
+    background: var(--accent-dim);
+    color: var(--accent);
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+  .lang-select option { background: var(--select-opt-bg); color: var(--text); }
+  .lang-arrow {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    pointer-events: none; color: var(--text-dim);
+    font-size: 0.55rem; transition: color 0.2s;
+  }
+  .lang-select-wrap:hover .lang-arrow { color: var(--accent); }
+
+  /* ── MAIN ── */
+  main { width: 100%; max-width: 900px; }
+
+  .panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; overflow: hidden; margin-bottom: 20px;
+    transition: background 0.3s, border-color 0.3s;
+  }
+  .panel-head {
+    padding: 10px 18px; background: var(--panel-tint);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--mono); font-size: 0.66rem; font-weight: 500;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-dim);
+    transition: background 0.3s, border-color 0.3s, color 0.3s;
+  }
+  .panel-head::before {
+    content: ''; display: inline-block;
+    width: 3px; height: 12px; background: var(--accent);
+    border-radius: 2px; flex-shrink: 0; transition: background 0.3s;
+  }
+  .panel-body { padding: 20px 22px; }
+
+  /* ── FORM ── */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group.full { grid-column: 1 / -1; }
+
+  label {
+    font-family: var(--mono); font-size: 0.63rem; font-weight: 500;
+    letter-spacing: 0.13em; text-transform: uppercase; color: var(--text-dim);
+    transition: color 0.3s;
+    cursor: pointer;
+  }
+
+  input, select {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+    color: var(--text); font-family: var(--mono); font-size: 0.85rem;
+    padding: 9px 12px; outline: none; width: 100%;
+    appearance: none; -webkit-appearance: none;
+    transition: border-color 0.2s, box-shadow 0.2s, background 0.3s, color 0.3s;
+    /* Hauteur min pour les cibles tactiles (WCAG 2.5.5) */
+    min-height: 44px;
+  }
+  input:focus-visible, select:focus-visible {
+    border-color: var(--accent2);
+    box-shadow: 0 0 0 3px rgba(0,212,255,0.25);
+    outline: none;
+  }
+  /* Indicateur d'erreur */
+  input[aria-invalid="true"] {
+    border-color: var(--err);
+    box-shadow: 0 0 0 2px rgba(255,78,106,0.2);
+  }
+  input::placeholder { color: var(--text-dim); }
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237a9ab8' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center;
+    padding-right: 32px; cursor: pointer;
+  }
+  select option { background: var(--select-opt-bg); }
+
+  /* ── DNS TABS ── */
+  .dns-section { margin-top: 4px; }
+  .dns-tabs {
+    display: flex; border: 1px solid var(--border);
+    border-radius: 4px; overflow: hidden; margin-bottom: 12px;
+    width: fit-content; transition: border-color 0.3s;
+  }
+  .dns-tab {
+    padding: 7px 15px; font-family: var(--mono); font-size: 0.66rem;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    cursor: pointer; border: none; background: transparent;
+    color: var(--text-dim); transition: all 0.18s; user-select: none;
+    min-height: 44px;
+  }
+  .dns-tab[aria-selected="true"] { background: var(--accent-dim); color: var(--accent); }
+  .dns-tab:hover:not([aria-selected="true"]) { background: var(--panel-tint); color: var(--text-mid); }
+  .dns-tab:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: -2px;
+    z-index: 1;
+  }
+
+  .dns-pane { display: none; }
+  .dns-pane.active { display: block; }
+
+  .custom-dns-wrap { display: flex; gap: 8px; flex-wrap: wrap; }
+  .custom-dns-wrap input { flex: 1; min-width: 180px; }
+  .custom-dns-hint {
+    margin-top: 6px; font-family: var(--mono);
+    font-size: 0.63rem; color: var(--text-dim); transition: color 0.3s;
+  }
+
+  /* ── PRESET GRID ── */
+  .dns-preset-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 6px; max-height: 220px; overflow-y: auto; padding-right: 4px;
+  }
+  .dns-preset-grid::-webkit-scrollbar { width: 4px; }
+  .dns-preset-grid::-webkit-scrollbar-track { background: transparent; }
+  .dns-preset-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .dns-check-item {
+    display: flex; align-items: center; gap: 9px;
+    padding: 7px 10px; border: 1px solid var(--border); border-radius: 4px;
+    cursor: pointer; transition: border-color 0.15s, background 0.15s; user-select: none;
+    min-height: 48px;
+  }
+  .dns-check-item:hover  { border-color: var(--border-hi); background: var(--panel-tint); }
+  .dns-check-item:focus-within {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+    border-color: var(--accent2);
+  }
+  .dns-check-item.checked{ border-color: var(--accent2); background: var(--accent-dim); }
+  .dns-check-item input[type=radio] {
+    /* Visible pour les lecteurs d'écran, masqué visuellement */
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .dns-radio-dot {
+    width: 14px; height: 14px; border: 1.5px solid var(--border-hi);
+    border-radius: 50%; flex-shrink: 0; transition: border-color 0.15s, box-shadow 0.15s;
+    /* Indicateur visuel aria-checked */
+    pointer-events: none;
+  }
+  .dns-check-item.checked .dns-radio-dot {
+    border-color: var(--accent2); box-shadow: inset 0 0 0 4px var(--accent2);
+  }
+  .dns-item-ip {
+    font-family: var(--mono); font-size: 0.76rem; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color 0.3s;
+  }
+  .dns-item-name { font-size: 0.62rem; color: var(--text-dim); margin-top: 1px; transition: color 0.3s; }
+
+  .dns-select-actions { display: flex; gap: 8px; margin-top: 8px; }
+  .btn-link {
+    font-family: var(--mono); font-size: 0.63rem; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--text-dim);
+    background: none; border: none; cursor: pointer; padding: 3px 0;
+    text-decoration: underline; text-underline-offset: 3px;
+    text-decoration-color: transparent;
+    transition: color 0.15s, text-decoration-color 0.15s;
+    min-height: 44px;
+  }
+  .btn-link:hover, .btn-link:focus-visible { color: var(--accent); text-decoration-color: var(--accent2); }
+
+  /* ── TIMEOUT ── */
+  .timeout-wrap { display: flex; align-items: center; gap: 10px; }
+  .timeout-wrap input[type=range] {
+    flex: 1; padding: 0; border: none; cursor: pointer;
+    min-height: 44px; background: transparent;
+    appearance: none; -webkit-appearance: none;
+  }
+  /* Track — Webkit/Blink */
+  .timeout-wrap input[type=range]::-webkit-slider-runnable-track {
+    height: 6px; border-radius: 3px;
+    background: var(--border-hi);
+    border: 1px solid var(--border-hi);
+    transition: background 0.3s;
+  }
+  .timeout-wrap input[type=range]:focus-visible::-webkit-slider-runnable-track {
+    background: var(--accent2);
+  }
+  /* Track — Firefox */
+  .timeout-wrap input[type=range]::-moz-range-track {
+    height: 6px; border-radius: 3px;
+    background: var(--border-hi);
+    border: 1px solid var(--border-hi);
+    transition: background 0.3s;
+  }
+  /* Thumb — Webkit/Blink */
+  .timeout-wrap input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--surface);
+    box-shadow: 0 0 0 1.5px var(--accent2);
+    margin-top: -6px;
+    cursor: pointer; transition: background 0.2s, box-shadow 0.2s;
+  }
+  .timeout-wrap input[type=range]:hover::-webkit-slider-thumb {
+    box-shadow: 0 0 0 3px var(--accent-dim), 0 0 0 1.5px var(--accent2);
+  }
+  /* Thumb — Firefox */
+  .timeout-wrap input[type=range]::-moz-range-thumb {
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--surface);
+    box-shadow: 0 0 0 1.5px var(--accent2);
+    cursor: pointer; transition: background 0.2s;
+  }
+  /* Portion remplie — Firefox */
+  .timeout-wrap input[type=range]::-moz-range-progress {
+    height: 6px; border-radius: 3px;
+    background: var(--accent2);
+  }
+  .timeout-val {
+    font-family: var(--mono); font-size: 0.82rem; color: var(--accent);
+    min-width: 42px; text-align: right; transition: color 0.3s;
+  }
+
+  /* ── SUBMIT ── */
+  .submit-row { margin-top: 22px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .btn-submit {
+    display: flex; align-items: center; gap: 9px;
+    background: var(--accent-dim); border: 1px solid var(--accent2); color: var(--accent);
+    font-family: var(--mono); font-size: 0.78rem; font-weight: 600;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    padding: 10px 26px; border-radius: 4px; cursor: pointer;
+    position: relative; overflow: hidden;
+    transition: background 0.2s, box-shadow 0.2s, border-color 0.3s, color 0.3s;
+    min-height: 44px;
+  }
+  .btn-submit::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(0,212,255,0.1), transparent);
+    transform: translateX(-100%); transition: transform 0.4s;
+  }
+  .btn-submit:hover::before { transform: translateX(100%); }
+  .btn-submit:hover { box-shadow: 0 0 20px rgba(0,144,204,0.2); filter: brightness(1.08); }
+  .btn-submit:active { transform: scale(0.98); }
+  .btn-submit:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-submit:focus-visible {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: 3px;
+  }
+  .spinner {
+    display: none; width: 16px; height: 16px;
+    border: 2px solid rgba(0,144,204,0.2); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.7s linear infinite;
+  }
+  .loading .spinner { display: block; }
+  .loading .send-icon { display: none; }
+  .query-hint {
+    font-family: var(--mono); font-size: 0.67rem; color: var(--text-dim);
+  }
+  .query-hint[role="alert"] { color: var(--warn); }
+
+  /* ── RESULTS ── */
+  #results-panel { display: none; }
+  .result-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .badge {
+    font-family: var(--mono); font-size: 0.63rem; font-weight: 600;
+    letter-spacing: 0.12em; text-transform: uppercase; padding: 3px 10px; border-radius: 3px;
+  }
+  .badge-success  { background: var(--ok-dim);   color: var(--ok);   border: 1px solid var(--ok);   }
+  .badge-error    { background: var(--err-dim);  color: var(--err);  border: 1px solid var(--err);  }
+  .badge-tmout    { background: var(--warn-dim); color: var(--warn); border: 1px solid var(--warn); }
+  .badge-nxdomain { background: var(--warn-dim); color: var(--warn); border: 1px solid var(--warn); }
+  .result-query-str { font-family: var(--mono); font-size: 0.72rem; color: var(--text-mid); transition: color 0.3s; }
+  .result-time { margin-left: auto; font-family: var(--mono); font-size: 0.67rem; color: var(--text-dim); transition: color 0.3s; }
+
+  .btn-copy {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: transparent; border: 1px solid var(--border);
+    color: var(--text-dim); border-radius: 4px;
+    font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.08em;
+    text-transform: uppercase; padding: 4px 9px; cursor: pointer;
+    transition: border-color 0.2s, background 0.2s, color 0.2s;
+    white-space: nowrap; min-height: 28px; line-height: 1;
+  }
+  .btn-copy:hover, .btn-copy:focus-visible {
+    border-color: var(--accent2); background: var(--accent-dim); color: var(--accent);
+  }
+  .btn-copy.copied {
+    border-color: var(--ok); color: var(--ok); background: var(--ok-dim);
+    pointer-events: none;
+  }
+  .btn-copy-row {
+    padding: 2px 6px; min-height: 22px; font-size: 0.58rem; gap: 3px;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.15s, border-color 0.2s, background 0.2s, color 0.2s;
+  }
+  .result-table tr:hover .btn-copy-row,
+  .result-table tr:focus-within .btn-copy-row {
+    opacity: 1; pointer-events: auto;
+  }
+  .btn-copy-row.copied { opacity: 1; pointer-events: none; }
+  .td-copy { width: 1%; white-space: nowrap; padding: 6px 8px !important; text-align: center; }
+  [dir="rtl"] .td-copy { text-align: center; }
+
+  .result-table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 0.8rem; }
+  .result-table thead tr { border-bottom: 1px solid var(--border-hi); }
+  .result-table th {
+    text-align: left; padding: 6px 12px 8px;
+    font-size: 0.6rem; font-weight: 500; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--text-dim); transition: color 0.3s;
+  }
+  [dir="rtl"] .result-table th { text-align: right; }
+  [dir="rtl"] .result-table td { text-align: right; }
+  .result-table td {
+    padding: 9px 12px; border-bottom: 1px solid var(--border);
+    color: var(--text); vertical-align: top; word-break: break-all;
+    transition: background 0.15s, color 0.3s, border-color 0.3s;
+  }
+  .result-table tr:last-child td { border-bottom: none; }
+  .result-table tr:hover td { background: var(--panel-tint); }
+  .td-record { color: var(--text-mid) !important; }
+  .td-type   { color: var(--accent)   !important; }
+  .td-ttl    { color: var(--text-dim) !important; }
+  .td-data   { color: var(--ok)       !important; font-weight: 500; }
+
+  .raw-block {
+    background: var(--raw-bg); border: 1px solid var(--border); border-radius: 4px;
+    padding: 14px 16px; font-family: var(--mono); font-size: 0.78rem; color: var(--text-mid);
+    white-space: pre-wrap; word-break: break-all; line-height: 1.7;
+    transition: background 0.3s, border-color 0.3s, color 0.3s;
+  }
+  .no-answer {
+    text-align: center; padding: 30px;
+    font-family: var(--mono); font-size: 0.8rem; color: var(--text-dim); transition: color 0.3s;
+  }
+
+  /* ── REDUCE MOTION ── */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  /* ── HIGH CONTRAST ── */
+  @media (forced-colors: active) {
+    .dns-check-item.checked { forced-color-adjust: none; border: 2px solid Highlight; }
+    .btn-submit             { forced-color-adjust: none; border: 2px solid ButtonText; }
+    .badge-success, .badge-error, .badge-tmout, .badge-nxdomain { forced-color-adjust: none; }
+  }
+
+  footer {
+    margin-top: 48px; font-family: var(--mono); font-size: 0.6rem;
+    color: var(--text-dim); letter-spacing: 0.08em; text-align: center; opacity: 0.45;
+  }
+
+  @keyframes spin  { to { transform: rotate(360deg); } }
+
+  @media (max-width: 580px) {
+    .form-grid { grid-template-columns: 1fr; }
+    .form-group.full { grid-column: 1; }
+    .dns-preset-grid { grid-template-columns: 1fr 1fr; }
+    .theme-label { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Lien d'évitement pour les utilisateurs de clavier / lecteur d'écran -->
+<a class="skip-link" href="#main-content" id="skip-link">Skip to main content</a>
+
+<header role="banner">
+  <svg class="logo-shield" viewBox="0 0 40 44" fill="none" xmlns="http://www.w3.org/2000/svg"
+       aria-hidden="true" focusable="false">
+    <path d="M20 2L4 9v14c0 9 7 17.4 16 20 9-2.6 16-11 16-20V9L20 2z"/>
+    <circle cx="20" cy="22" r="5"/>
+    <line x1="20" y1="15" x2="20" y2="17"/>
+    <line x1="20" y1="27" x2="20" y2="29"/>
+    <line x1="13" y1="22" x2="15" y2="22"/>
+    <line x1="25" y1="22" x2="27" y2="22"/>
+  </svg>
+  <div class="header-text">
+    <h1>DNS Query</h1>
+    <p id="hdr-subtitle" aria-live="polite"></p>
+  </div>
+  <div class="header-right">
+    <!-- Language selector -->
+    <div class="lang-select-wrap">
+      <label for="lang-select" class="visually-hidden" id="lang-select-label">Language</label>
+      <select class="lang-select" id="lang-select" aria-labelledby="lang-select-label" title="Language / Langue">
+        <option value="ar">AR</option>
+        <option value="bn">BN</option>
+        <option value="de">DE</option>
+        <option value="en">EN</option>
+        <option value="es">ES</option>
+        <option value="fr">FR</option>
+        <option value="hi">HI</option>
+        <option value="id">ID</option>
+        <option value="ja">JA</option>
+        <option value="ko">KO</option>
+        <option value="pt-BR">PT</option>
+        <option value="ru">RU</option>
+        <option value="ur">UR</option>
+        <option value="vi">VI</option>
+        <option value="zh-CN">ZH</option>
+      </select>
+      <span class="lang-arrow" aria-hidden="true">▾</span>
+    </div>
+    <!-- Theme toggle -->
+    <button class="theme-toggle" id="theme-toggle"
+            role="switch"
+            aria-checked="false"
+            aria-label="Toggle color theme">
+      <span class="theme-icon" id="theme-icon" aria-hidden="true">☀️</span>
+      <div class="theme-track" aria-hidden="true"><div class="theme-thumb"></div></div>
+      <span class="theme-label" id="theme-label"></span>
+    </button>
+  </div>
+</header>
+
+<!-- Région principale avec id pour le skip-link -->
+<main id="main-content" role="main">
+
+  <!-- Zone de statut pour annonces lecteur d'écran -->
+  <div id="sr-status" aria-live="polite" aria-atomic="true"
+       style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;"></div>
+
+  <section class="panel" aria-labelledby="ph-params">
+    <div class="panel-head" id="ph-params" role="heading" aria-level="2"></div>
+    <div class="panel-body">
+      <form id="dns-form" novalidate aria-label="DNS query form">
+        <div class="form-grid">
+
+          <div class="form-group full">
+            <label for="record" id="lbl-record"></label>
+            <input type="text" id="record" name="record"
+                   autocomplete="off" spellcheck="false"
+                   aria-labelledby="lbl-record"
+                   aria-describedby="record-hint"
+                   aria-required="true"
+                   aria-invalid="false">
+            <span id="record-hint" style="display:none"></span>
+          </div>
+
+          <div class="form-group">
+            <label for="class" id="lbl-class"></label>
+            <select id="class" name="class" aria-labelledby="lbl-class">
+              <option value="IN" selected>IN — Internet</option>
+              <option value="CH">CH — Chaos</option>
+              <option value="HS">HS — Hesiod</option>
+              <option value="CS">CS — CSNet</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="type" id="lbl-type"></label>
+            <select id="type" name="type" aria-labelledby="lbl-type">
+              <option value="A" selected>A</option>
+              <option value="AAAA">AAAA</option>
+              <option value="CNAME">CNAME</option>
+              <option value="MX">MX</option>
+              <option value="NS">NS</option>
+              <option value="PTR">PTR</option>
+              <option value="SOA">SOA</option>
+              <option value="TXT">TXT</option>
+              <option value="SRV">SRV</option>
+              <option value="NAPTR">NAPTR</option>
+              <option value="OPT">OPT</option>
+              <option value="ANY">ANY</option>
+            </select>
+          </div>
+
+          <div class="form-group full">
+            <label for="timeout-slider" id="lbl-timeout"></label>
+            <div class="timeout-wrap">
+              <input type="range" id="timeout-slider" name="timeout"
+                     min="1" max="30" value="10" step="1"
+                     aria-labelledby="lbl-timeout"
+                     aria-valuemin="1" aria-valuemax="30" aria-valuenow="10"
+                     aria-valuetext="10 seconds">
+              <span class="timeout-val" id="timeout-val" aria-hidden="true">10 s</span>
+            </div>
+          </div>
+
+          <!-- DNS SECTION avec rôle tablist -->
+          <div class="form-group full dns-section">
+            <label id="lbl-dns"></label>
+            <div class="dns-tabs" role="tablist" aria-labelledby="lbl-dns">
+              <button class="dns-tab" role="tab"
+                      id="tab-default" data-tab="default"
+                      aria-selected="true" aria-controls="pane-default"
+                      tabindex="0"></button>
+              <button class="dns-tab" role="tab"
+                      id="tab-preset" data-tab="preset"
+                      aria-selected="false" aria-controls="pane-preset"
+                      tabindex="-1"></button>
+              <button class="dns-tab" role="tab"
+                      id="tab-custom" data-tab="custom"
+                      aria-selected="false" aria-controls="pane-custom"
+                      tabindex="-1"></button>
+            </div>
+
+            <div class="dns-pane active" id="pane-default"
+                 role="tabpanel" aria-labelledby="tab-default" tabindex="0">
+              <div class="raw-block" style="padding:10px 14px;font-size:0.72rem;color:var(--text-dim);"
+                   id="default-dns-hint"></div>
+            </div>
+
+            <div class="dns-pane" id="pane-preset"
+                 role="tabpanel" aria-labelledby="tab-preset" tabindex="0" hidden>
+              <div class="dns-preset-grid" id="preset-grid"
+                   role="radiogroup" aria-labelledby="lbl-dns"></div>
+              <div class="dns-select-actions">
+                <button class="btn-link" id="deselect-all" type="button"></button>
+              </div>
+            </div>
+
+            <div class="dns-pane" id="pane-custom"
+                 role="tabpanel" aria-labelledby="tab-custom" tabindex="0" hidden>
+              <div class="custom-dns-wrap">
+                <input type="text" id="custom-dns" name="custom-dns"
+                       spellcheck="false"
+                       aria-labelledby="lbl-dns"
+                       aria-describedby="custom-dns-hint">
+              </div>
+              <div class="custom-dns-hint" id="custom-dns-hint"></div>
+            </div>
+          </div>
+
+        </div><!-- /form-grid -->
+
+        <div class="submit-row">
+          <button class="btn-submit" id="btn-query" type="submit"
+                  aria-describedby="query-hint">
+            <svg class="send-icon" width="15" height="15" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round"
+                 aria-hidden="true" focusable="false">
+              <line x1="22" y1="2" x2="11" y2="13"/>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+            <div class="spinner" aria-hidden="true"></div>
+            <span id="btn-send-label"></span>
+          </button>
+          <span class="query-hint" id="query-hint" aria-live="assertive" role="status"></span>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- Panneau résultats -->
+  <section class="panel" id="results-panel"
+           aria-labelledby="ph-results"
+           aria-live="polite">
+    <div class="panel-head" id="ph-results" role="heading" aria-level="2"></div>
+    <div class="panel-body" id="results-body"></div>
+  </section>
+
+</main>
+
+<footer role="contentinfo" id="footer-text">DNS QUERY TOOL · CERT · v1.0</footer>
+
+<!-- Classe utilitaire visually-hidden -->
+<style>
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important; height: 1px !important;
+  padding: 0 !important; margin: -1px !important;
+  overflow: hidden !important; clip: rect(0,0,0,0) !important;
+  white-space: nowrap !important; border: 0 !important;
+}
+</style>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// I18N — TRANSLATIONS
+// ══════════════════════════════════════════════════════════════════
+const LANGS = {
+  ar: {
+    subtitle:       'استخبارات التهديدات الإلكترونية · أداة استطلاع الشبكة',
+    themeLight:     'فاتح',
+    themeDark:      'داكن',
+    panelParams:    'معاملات الاستعلام',
+    labelRecord:    'السجل (FQDN / IP)',
+    placeholderRec: 'مثال: m.root-servers.net أو 1.2.3.4',
+    labelClass:     'الفئة',
+    labelType:      'النوع',
+    labelTimeout:   'المهلة',
+    labelDns:       'خوادم DNS',
+    tabDefault:     'افتراضي',
+    tabPreset:      'محدد مسبقًا',
+    tabCustom:      'مخصص',
+    defaultHint:    'يستخدم محللات API الافتراضية.',
+    deselect:       'إلغاء التحديد',
+    customPlaceholder: 'مثال: 1.1.1.1, 8.8.8.8',
+    customHint:     'IPv4 و IPv6 مقبولان · فصل بفاصلة أو مسافة',
+    btnSend:        'إرسال الاستعلام',
+    panelResults:   'النتائج',
+    colRecord:      'السجل',
+    colType:        'النوع',
+    colTtl:         'TTL',
+    colData:        'البيانات',
+    nxdomain:       'NXDOMAIN — النطاق غير موجود.',
+    tmout:          n => `انتهت المهلة (${n}ث) — لا يوجد رد.`,
+    noAnswer:       'لم يُعثر على أي سجل.',
+    errBadge:       'خطأ',
+    warnNoRecord:   '⚠ أدخل سجلاً',
+    replyCount:     n => `${n} إجابة (إجابات)`,
+    dir:            'rtl',
+    skipLink:       'انتقل إلى المحتوى الرئيسي',
+    loadingLabel:   'جارٍ تنفيذ الاستعلام…',
+    resultsReady:   n => `اكتمل الاستعلام، ${n} نتيجة.`,
+    copyCSV:        'نسخ CSV',
+    copyRowData:    'نسخ',
+    copied:         'تم النسخ ✓',
+  },
+  bn: {
+    subtitle:       'সাইবার হুমকি গোয়েন্দা · নেটওয়ার্ক রিকন টুল',
+    themeLight:     'হালকা',
+    themeDark:      'গাঢ়',
+    panelParams:    'কোয়েরি প্যারামিটার',
+    labelRecord:    'রেকর্ড (FQDN / IP)',
+    placeholderRec: 'যেমন: m.root-servers.net বা 1.2.3.4',
+    labelClass:     'ক্লাস',
+    labelType:      'ধরন',
+    labelTimeout:   'টাইমআউট',
+    labelDns:       'DNS সার্ভার',
+    tabDefault:     'ডিফল্ট',
+    tabPreset:      'পূর্বনির্ধারিত',
+    tabCustom:      'কাস্টম',
+    defaultHint:    'API-র ডিফল্ট রিজলভার ব্যবহার করে।',
+    deselect:       'নির্বাচন বাতিল',
+    customPlaceholder: 'যেমন: 1.1.1.1, 8.8.8.8',
+    customHint:     'IPv4 ও IPv6 গৃহীত · কমা বা স্পেস দিয়ে আলাদা করুন',
+    btnSend:        'কোয়েরি পাঠান',
+    panelResults:   'ফলাফল',
+    colRecord:      'রেকর্ড',
+    colType:        'ধরন',
+    colTtl:         'TTL',
+    colData:        'ডেটা',
+    nxdomain:       'NXDOMAIN — ডোমেইন বিদ্যমান নেই।',
+    tmout:          n => `টাইমআউট (${n}s) — কোনো সাড়া নেই।`,
+    noAnswer:       'কোনো রেকর্ড পাওয়া যায়নি।',
+    errBadge:       'ত্রুটি',
+    warnNoRecord:   '⚠ একটি রেকর্ড লিখুন',
+    replyCount:     n => `${n}টি উত্তর`,
+    dir:            'ltr',
+    skipLink:       'মূল বিষয়বস্তুতে যান',
+    loadingLabel:   'কোয়েরি চলছে…',
+    resultsReady:   n => `কোয়েরি সম্পন্ন, ${n}টি ফলাফল।`,
+    copyCSV:        'CSV কপি',
+    copyRowData:    'কপি',
+    copied:         'কপি হয়েছে ✓',
+  },
+  hi: {
+    subtitle:       'साइबर खतरा खुफिया · नेटवर्क टोही उपकरण',
+    themeLight:     'हल्का',
+    themeDark:      'गहरा',
+    panelParams:    'क्वेरी पैरामीटर',
+    labelRecord:    'रिकॉर्ड (FQDN / IP)',
+    placeholderRec: 'उदा: m.root-servers.net या 1.2.3.4',
+    labelClass:     'वर्ग',
+    labelType:      'प्रकार',
+    labelTimeout:   'टाइमआउट',
+    labelDns:       'DNS सर्वर',
+    tabDefault:     'डिफ़ॉल्ट',
+    tabPreset:      'पूर्वनिर्धारित',
+    tabCustom:      'कस्टम',
+    defaultHint:    'API के डिफ़ॉल्ट रिज़ॉल्वर उपयोग करता है।',
+    deselect:       'चयन रद्द करें',
+    customPlaceholder: 'उदा: 1.1.1.1, 8.8.8.8',
+    customHint:     'IPv4 और IPv6 स्वीकृत · कॉमा या स्पेस से अलग करें',
+    btnSend:        'क्वेरी भेजें',
+    panelResults:   'परिणाम',
+    colRecord:      'रिकॉर्ड',
+    colType:        'प्रकार',
+    colTtl:         'TTL',
+    colData:        'डेटा',
+    nxdomain:       'NXDOMAIN — डोमेन मौजूद नहीं है।',
+    tmout:          n => `टाइमआउट (${n}s) — कोई जवाब नहीं।`,
+    noAnswer:       'कोई रिकॉर्ड नहीं मिला।',
+    errBadge:       'त्रुटि',
+    warnNoRecord:   '⚠ कोई रिकॉर्ड दर्ज करें',
+    replyCount:     n => `${n} उत्तर`,
+    dir:            'ltr',
+    skipLink:       'मुख्य सामग्री पर जाएं',
+    loadingLabel:   'क्वेरी चल रही है…',
+    resultsReady:   n => `क्वेरी पूर्ण, ${n} परिणाम।`,
+    copyCSV:        'CSV कॉपी',
+    copyRowData:    'कॉपी',
+    copied:         'कॉपी हो गया ✓',
+  },
+  id: {
+    subtitle:       'Intelijen Ancaman Siber · Alat Rekon Jaringan',
+    themeLight:     'Terang',
+    themeDark:      'Gelap',
+    panelParams:    'Parameter Kueri',
+    labelRecord:    'Rekaman (FQDN / IP)',
+    placeholderRec: 'mis.: m.root-servers.net atau 1.2.3.4',
+    labelClass:     'Kelas',
+    labelType:      'Tipe',
+    labelTimeout:   'Batas waktu',
+    labelDns:       'Server DNS',
+    tabDefault:     'Default',
+    tabPreset:      'Preset',
+    tabCustom:      'Kustom',
+    defaultHint:    'Menggunakan resolver default API.',
+    deselect:       'Batalkan pilihan',
+    customPlaceholder: 'mis.: 1.1.1.1, 8.8.8.8',
+    customHint:     'IPv4 dan IPv6 diterima · pisahkan dengan koma atau spasi',
+    btnSend:        'Kirim Kueri',
+    panelResults:   'Hasil',
+    colRecord:      'Rekaman',
+    colType:        'Tipe',
+    colTtl:         'TTL',
+    colData:        'Data',
+    nxdomain:       'NXDOMAIN — domain tidak ditemukan.',
+    tmout:          n => `Batas waktu tercapai (${n}s) — tidak ada respons.`,
+    noAnswer:       'Tidak ada rekaman ditemukan.',
+    errBadge:       'KESALAHAN',
+    warnNoRecord:   '⚠ Masukkan rekaman',
+    replyCount:     n => `${n} jawaban`,
+    dir:            'ltr',
+    skipLink:       'Lewati ke konten utama',
+    loadingLabel:   'Menjalankan kueri…',
+    resultsReady:   n => `Kueri selesai, ${n} hasil.`,
+    copyCSV:        'Salin CSV',
+    copyRowData:    'Salin',
+    copied:         'Disalin ✓',
+  },
+  ko: {
+    subtitle:       '사이버 위협 인텔리전스 · 네트워크 정찰 도구',
+    themeLight:     '라이트',
+    themeDark:      '다크',
+    panelParams:    '쿼리 매개변수',
+    labelRecord:    '레코드 (FQDN / IP)',
+    placeholderRec: '예: m.root-servers.net 또는 1.2.3.4',
+    labelClass:     '클래스',
+    labelType:      '유형',
+    labelTimeout:   '타임아웃',
+    labelDns:       'DNS 서버',
+    tabDefault:     '기본값',
+    tabPreset:      '프리셋',
+    tabCustom:      '사용자 지정',
+    defaultHint:    'API의 기본 리졸버를 사용합니다.',
+    deselect:       '선택 취소',
+    customPlaceholder: '예: 1.1.1.1, 8.8.8.8',
+    customHint:     'IPv4 및 IPv6 허용 · 쉼표 또는 공백으로 구분',
+    btnSend:        '쿼리 전송',
+    panelResults:   '결과',
+    colRecord:      '레코드',
+    colType:        '유형',
+    colTtl:         'TTL',
+    colData:        '데이터',
+    nxdomain:       'NXDOMAIN — 도메인이 존재하지 않습니다.',
+    tmout:          n => `타임아웃 (${n}s) — 응답 없음.`,
+    noAnswer:       '레코드를 찾을 수 없습니다.',
+    errBadge:       '오류',
+    warnNoRecord:   '⚠ 레코드를 입력하세요',
+    replyCount:     n => `${n}개 응답`,
+    dir:            'ltr',
+    skipLink:       '본문으로 건너뛰기',
+    loadingLabel:   '쿼리 실행 중…',
+    resultsReady:   n => `쿼리 완료, ${n}개 결과.`,
+    copyCSV:        'CSV 복사',
+    copyRowData:    '복사',
+    copied:         '복사됨 ✓',
+  },
+  ur: {
+    subtitle:       'سائبر خطرہ انٹیلیجنس · نیٹ ورک ریکون ٹول',
+    themeLight:     'روشن',
+    themeDark:      'تاریک',
+    panelParams:    'کوئری پیرامیٹرز',
+    labelRecord:    'ریکارڈ (FQDN / IP)',
+    placeholderRec: 'مثلاً: m.root-servers.net یا 1.2.3.4',
+    labelClass:     'کلاس',
+    labelType:      'قسم',
+    labelTimeout:   'ٹائم آؤٹ',
+    labelDns:       'DNS سرورز',
+    tabDefault:     'ڈیفالٹ',
+    tabPreset:      'پیش سیٹ',
+    tabCustom:      'کسٹم',
+    defaultHint:    'API کے ڈیفالٹ ریزولورز استعمال کرتا ہے۔',
+    deselect:       'انتخاب ہٹائیں',
+    customPlaceholder: 'مثلاً: 1.1.1.1, 8.8.8.8',
+    customHint:     'IPv4 اور IPv6 قابلِ قبول · کاما یا اسپیس سے الگ کریں',
+    btnSend:        'کوئری بھیجیں',
+    panelResults:   'نتائج',
+    colRecord:      'ریکارڈ',
+    colType:        'قسم',
+    colTtl:         'TTL',
+    colData:        'ڈیٹا',
+    nxdomain:       'NXDOMAIN — ڈومین موجود نہیں ہے۔',
+    tmout:          n => `ٹائم آؤٹ (${n}s) — کوئی جواب نہیں۔`,
+    noAnswer:       'کوئی ریکارڈ نہیں ملا۔',
+    errBadge:       'خطا',
+    warnNoRecord:   '⚠ ریکارڈ درج کریں',
+    replyCount:     n => `${n} جواب`,
+    dir:            'rtl',
+    skipLink:       'مرکزی مواد پر جائیں',
+    loadingLabel:   'کوئری چل رہی ہے…',
+    resultsReady:   n => `کوئری مکمل، ${n} نتائج۔`,
+    copyCSV:        'CSV کاپی',
+    copyRowData:    'کاپی',
+    copied:         'کاپی ہو گیا ✓',
+  },
+  vi: {
+    subtitle:       'Tình báo Mối đe dọa Mạng · Công cụ Trinh sát Mạng',
+    themeLight:     'Sáng',
+    themeDark:      'Tối',
+    panelParams:    'Tham số truy vấn',
+    labelRecord:    'Bản ghi (FQDN / IP)',
+    placeholderRec: 'vd: m.root-servers.net hoặc 1.2.3.4',
+    labelClass:     'Lớp',
+    labelType:      'Loại',
+    labelTimeout:   'Thời gian chờ',
+    labelDns:       'Máy chủ DNS',
+    tabDefault:     'Mặc định',
+    tabPreset:      'Đặt sẵn',
+    tabCustom:      'Tùy chỉnh',
+    defaultHint:    'Sử dụng các trình phân giải mặc định của API.',
+    deselect:       'Bỏ chọn',
+    customPlaceholder: 'vd: 1.1.1.1, 8.8.8.8',
+    customHint:     'Chấp nhận IPv4 và IPv6 · phân tách bằng dấu phẩy hoặc khoảng trắng',
+    btnSend:        'Gửi truy vấn',
+    panelResults:   'Kết quả',
+    colRecord:      'Bản ghi',
+    colType:        'Loại',
+    colTtl:         'TTL',
+    colData:        'Dữ liệu',
+    nxdomain:       'NXDOMAIN — tên miền không tồn tại.',
+    tmout:          n => `Hết thời gian (${n}s) — không có phản hồi.`,
+    noAnswer:       'Không tìm thấy bản ghi.',
+    errBadge:       'LỖI',
+    warnNoRecord:   '⚠ Nhập một bản ghi',
+    replyCount:     n => `${n} câu trả lời`,
+    dir:            'ltr',
+    skipLink:       'Chuyển đến nội dung chính',
+    loadingLabel:   'Đang thực hiện truy vấn…',
+    resultsReady:   n => `Truy vấn hoàn tất, ${n} kết quả.`,
+    copyCSV:        'Sao chép CSV',
+    copyRowData:    'Sao chép',
+    copied:         'Đã sao chép ✓',
+  },
+  de: {
+    subtitle:       'Cyber Threat Intelligence · Netzwerk-Recon-Tool',
+    themeLight:     'Hell',
+    themeDark:      'Dunkel',
+    panelParams:    'Anfrageparameter',
+    labelRecord:    'Eintrag (FQDN / IP)',
+    placeholderRec: 'z. B.: m.root-servers.net oder 1.2.3.4',
+    labelClass:     'Klasse',
+    labelType:      'Typ',
+    labelTimeout:   'Timeout',
+    labelDns:       'DNS-Server',
+    tabDefault:     'Standard',
+    tabPreset:      'Vordefiniert',
+    tabCustom:      'Benutzerdefiniert',
+    defaultHint:    'Verwendet die Standard-Resolver der API.',
+    deselect:       'Auswahl aufheben',
+    customPlaceholder: 'z. B.: 1.1.1.1, 8.8.8.8',
+    customHint:     'IPv4 und IPv6 · durch Komma oder Leerzeichen trennen',
+    btnSend:        'Anfrage senden',
+    panelResults:   'Ergebnisse',
+    colRecord:      'Eintrag',
+    colType:        'Typ',
+    colTtl:         'TTL',
+    colData:        'Daten',
+    nxdomain:       'NXDOMAIN — Domain existiert nicht.',
+    tmout:          n => `Timeout erreicht (${n}s) — keine Antwort.`,
+    noAnswer:       'Keine Einträge gefunden.',
+    errBadge:       'FEHLER',
+    warnNoRecord:   '⚠ Eintrag eingeben',
+    replyCount:     n => `${n} Antwort(en)`,
+    dir:            'ltr',
+    skipLink:       'Zum Hauptinhalt springen',
+    loadingLabel:   'Abfrage läuft…',
+    resultsReady:   n => `Abfrage abgeschlossen, ${n} Ergebnis(se).`,
+    copyCSV:        'CSV kopieren',
+    copyRowData:    'Kopieren',
+    copied:         'Kopiert ✓',
+  },
+  en: {
+    subtitle:       'Cyber Threat Intelligence · Network Recon Tool',
+    themeLight:     'Light',
+    themeDark:      'Dark',
+    panelParams:    'Query Parameters',
+    labelRecord:    'Record (FQDN / IP)',
+    placeholderRec: 'e.g.: m.root-servers.net or 1.2.3.4',
+    labelClass:     'Class',
+    labelType:      'Type',
+    labelTimeout:   'Timeout',
+    labelDns:       'DNS Servers',
+    tabDefault:     'Default',
+    tabPreset:      'Preset',
+    tabCustom:      'Custom',
+    defaultHint:    "Uses the API's default resolvers.",
+    deselect:       'Deselect',
+    customPlaceholder: 'e.g.: 1.1.1.1, 8.8.8.8',
+    customHint:     'IPv4 and IPv6 accepted · separate by comma or space',
+    btnSend:        'Send Query',
+    panelResults:   'Results',
+    colRecord:      'Record',
+    colType:        'Type',
+    colTtl:         'TTL',
+    colData:        'Data',
+    nxdomain:       'NXDOMAIN — domain does not exist.',
+    tmout:          n => `Timeout reached (${n}s) — no response.`,
+    noAnswer:       'No record found.',
+    errBadge:       'ERROR',
+    warnNoRecord:   '⚠ Enter a record',
+    replyCount:     n => `${n} answer(s)`,
+    dir:            'ltr',
+    skipLink:       'Skip to main content',
+    loadingLabel:   'Running query…',
+    resultsReady:   n => `Query complete, ${n} result(s).`,
+    copyCSV:        'Copy CSV',
+    copyRowData:    'Copy',
+    copied:         'Copied! ✓',
+  },
+  es: {
+    subtitle:       'Inteligencia de Amenazas · Herramienta de Reconocimiento',
+    themeLight:     'Claro',
+    themeDark:      'Oscuro',
+    panelParams:    'Parámetros de Consulta',
+    labelRecord:    'Registro (FQDN / IP)',
+    placeholderRec: 'ej.: m.root-servers.net o 1.2.3.4',
+    labelClass:     'Clase',
+    labelType:      'Tipo',
+    labelTimeout:   'Tiempo límite',
+    labelDns:       'Servidores DNS',
+    tabDefault:     'Predeterminado',
+    tabPreset:      'Predefinidos',
+    tabCustom:      'Personalizado',
+    defaultHint:    'Usa los resolutores predeterminados de la API.',
+    deselect:       'Deseleccionar',
+    customPlaceholder: 'ej.: 1.1.1.1, 8.8.8.8',
+    customHint:     'IPv4 e IPv6 aceptados · separar por coma o espacio',
+    btnSend:        'Enviar consulta',
+    panelResults:   'Resultados',
+    colRecord:      'Registro',
+    colType:        'Tipo',
+    colTtl:         'TTL',
+    colData:        'Datos',
+    nxdomain:       'NXDOMAIN — el dominio no existe.',
+    tmout:          n => `Tiempo límite alcanzado (${n}s) — sin respuesta.`,
+    noAnswer:       'No se encontraron registros.',
+    errBadge:       'ERROR',
+    warnNoRecord:   '⚠ Introduce un registro',
+    replyCount:     n => `${n} respuesta(s)`,
+    dir:            'ltr',
+    skipLink:       'Saltar al contenido principal',
+    loadingLabel:   'Ejecutando consulta…',
+    resultsReady:   n => `Consulta completada, ${n} resultado(s).`,
+    copyCSV:        'Copiar CSV',
+    copyRowData:    'Copiar',
+    copied:         '¡Copiado! ✓',
+  },
+  fr: {
+    subtitle:       'Cyber Threat Intelligence · Network Recon Tool',
+    themeLight:     'Clair',
+    themeDark:      'Sombre',
+    panelParams:    'Paramètres de la requête',
+    labelRecord:    'Enregistrement (FQDN / IP)',
+    placeholderRec: 'ex: m.root-servers.net ou 1.2.3.4',
+    labelClass:     'Classe',
+    labelType:      'Type',
+    labelTimeout:   'Timeout',
+    labelDns:       'Serveurs DNS',
+    tabDefault:     'Défaut',
+    tabPreset:      'Prédéfinis',
+    tabCustom:      'Personnalisé',
+    defaultHint:    "Utilise les résolveurs par défaut de l'API.",
+    deselect:       'Désélectionner',
+    customPlaceholder: 'ex: 1.1.1.1, 8.8.8.8',
+    customHint:     'IPv4 et IPv6 acceptés · séparer par virgule ou espace',
+    btnSend:        'Envoyer la requête',
+    panelResults:   'Résultats',
+    colRecord:      'Enregistrement',
+    colType:        'Type',
+    colTtl:         'TTL',
+    colData:        'Données',
+    nxdomain:       "NXDOMAIN — le domaine n'existe pas.",
+    tmout:          n => `Timeout atteint (${n}s) — aucune réponse.`,
+    noAnswer:       'Aucun enregistrement trouvé.',
+    errBadge:       'ERREUR',
+    warnNoRecord:   '⚠ Entrez un enregistrement',
+    replyCount:     n => `${n} réponse(s)`,
+    dir:            'ltr',
+    skipLink:       'Aller au contenu principal',
+    loadingLabel:   'Exécution de la requête…',
+    resultsReady:   n => `Requête terminée, ${n} résultat(s).`,
+    copyCSV:        'Copier CSV',
+    copyRowData:    'Copier',
+    copied:         'Copié ! ✓',
+  },
+  ja: {
+    subtitle:       'サイバー脅威インテリジェンス · ネットワーク偵察ツール',
+    themeLight:     'ライト',
+    themeDark:      'ダーク',
+    panelParams:    'クエリパラメータ',
+    labelRecord:    'レコード（FQDN / IP）',
+    placeholderRec: '例: m.root-servers.net または 1.2.3.4',
+    labelClass:     'クラス',
+    labelType:      'タイプ',
+    labelTimeout:   'タイムアウト',
+    labelDns:       'DNS サーバー',
+    tabDefault:     'デフォルト',
+    tabPreset:      'プリセット',
+    tabCustom:      'カスタム',
+    defaultHint:    'API のデフォルトリゾルバを使用します。',
+    deselect:       '選択解除',
+    customPlaceholder: '例: 1.1.1.1, 8.8.8.8',
+    customHint:     'IPv4・IPv6 対応 · カンマまたはスペースで区切る',
+    btnSend:        'クエリを送信',
+    panelResults:   '結果',
+    colRecord:      'レコード',
+    colType:        'タイプ',
+    colTtl:         'TTL',
+    colData:        'データ',
+    nxdomain:       'NXDOMAIN — ドメインが存在しません。',
+    tmout:          n => `タイムアウト（${n}秒）— 応答なし。`,
+    noAnswer:       'レコードが見つかりません。',
+    errBadge:       'エラー',
+    warnNoRecord:   '⚠ レコードを入力してください',
+    replyCount:     n => `${n} 件の回答`,
+    dir:            'ltr',
+    skipLink:       'メインコンテンツへスキップ',
+    loadingLabel:   'クエリを実行中…',
+    resultsReady:   n => `クエリ完了、${n} 件の結果。`,
+    copyCSV:        'CSVをコピー',
+    copyRowData:    'コピー',
+    copied:         'コピーしました ✓',
+  },
+  'pt-BR': {
+    subtitle:       'Inteligência de Ameaças · Ferramenta de Reconhecimento',
+    themeLight:     'Claro',
+    themeDark:      'Escuro',
+    panelParams:    'Parâmetros da Consulta',
+    labelRecord:    'Registro (FQDN / IP)',
+    placeholderRec: 'ex.: m.root-servers.net ou 1.2.3.4',
+    labelClass:     'Classe',
+    labelType:      'Tipo',
+    labelTimeout:   'Tempo limite',
+    labelDns:       'Servidores DNS',
+    tabDefault:     'Padrão',
+    tabPreset:      'Predefinidos',
+    tabCustom:      'Personalizado',
+    defaultHint:    'Usa os resolvedores padrão da API.',
+    deselect:       'Desmarcar',
+    customPlaceholder: 'ex.: 1.1.1.1, 8.8.8.8',
+    customHint:     'IPv4 e IPv6 aceitos · separar por vírgula ou espaço',
+    btnSend:        'Enviar consulta',
+    panelResults:   'Resultados',
+    colRecord:      'Registro',
+    colType:        'Tipo',
+    colTtl:         'TTL',
+    colData:        'Dados',
+    nxdomain:       'NXDOMAIN — o domínio não existe.',
+    tmout:          n => `Tempo limite atingido (${n}s) — sem resposta.`,
+    noAnswer:       'Nenhum registro encontrado.',
+    errBadge:       'ERRO',
+    warnNoRecord:   '⚠ Informe um registro',
+    replyCount:     n => `${n} resposta(s)`,
+    dir:            'ltr',
+    skipLink:       'Pular para o conteúdo principal',
+    loadingLabel:   'Executando consulta…',
+    resultsReady:   n => `Consulta concluída, ${n} resultado(s).`,
+    copyCSV:        'Copiar CSV',
+    copyRowData:    'Copiar',
+    copied:         'Copiado! ✓',
+  },
+  ru: {
+    subtitle:       'Киберразведка угроз · Инструмент сетевой разведки',
+    themeLight:     'Светлая',
+    themeDark:      'Тёмная',
+    panelParams:    'Параметры запроса',
+    labelRecord:    'Запись (FQDN / IP)',
+    placeholderRec: 'напр.: m.root-servers.net или 1.2.3.4',
+    labelClass:     'Класс',
+    labelType:      'Тип',
+    labelTimeout:   'Таймаут',
+    labelDns:       'DNS-серверы',
+    tabDefault:     'По умолчанию',
+    tabPreset:      'Предустановленные',
+    tabCustom:      'Пользовательские',
+    defaultHint:    'Использует резолверы API по умолчанию.',
+    deselect:       'Снять выбор',
+    customPlaceholder: 'напр.: 1.1.1.1, 8.8.8.8',
+    customHint:     'IPv4 и IPv6 · разделять запятой или пробелом',
+    btnSend:        'Отправить запрос',
+    panelResults:   'Результаты',
+    colRecord:      'Запись',
+    colType:        'Тип',
+    colTtl:         'TTL',
+    colData:        'Данные',
+    nxdomain:       'NXDOMAIN — домен не существует.',
+    tmout:          n => `Таймаут (${n}с) — нет ответа.`,
+    noAnswer:       'Записи не найдены.',
+    errBadge:       'ОШИБКА',
+    warnNoRecord:   '⚠ Введите запись',
+    replyCount:     n => `${n} ответ(ов)`,
+    dir:            'ltr',
+    skipLink:       'Перейти к основному содержимому',
+    loadingLabel:   'Выполняется запрос…',
+    resultsReady:   n => `Запрос выполнен, ${n} результат(ов).`,
+    copyCSV:        'Скопировать CSV',
+    copyRowData:    'Скопировать',
+    copied:         'Скопировано ✓',
+  },
+  'zh-CN': {
+    subtitle:       '网络威胁情报 · 网络侦察工具',
+    themeLight:     '浅色',
+    themeDark:      '深色',
+    panelParams:    '查询参数',
+    labelRecord:    '记录（FQDN / IP）',
+    placeholderRec: '例：m.root-servers.net 或 1.2.3.4',
+    labelClass:     '类别',
+    labelType:      '类型',
+    labelTimeout:   '超时',
+    labelDns:       'DNS 服务器',
+    tabDefault:     '默认',
+    tabPreset:      '预设',
+    tabCustom:      '自定义',
+    defaultHint:    '使用 API 的默认解析器。',
+    deselect:       '取消选择',
+    customPlaceholder: '例：1.1.1.1, 8.8.8.8',
+    customHint:     '支持 IPv4 和 IPv6 · 用逗号或空格分隔',
+    btnSend:        '发送查询',
+    panelResults:   '结果',
+    colRecord:      '记录',
+    colType:        '类型',
+    colTtl:         'TTL',
+    colData:        '数据',
+    nxdomain:       'NXDOMAIN — 域名不存在。',
+    tmout:          n => `超时（${n}秒）— 无响应。`,
+    noAnswer:       '未找到记录。',
+    errBadge:       '错误',
+    warnNoRecord:   '⚠ 请输入记录',
+    replyCount:     n => `${n} 条回答`,
+    dir:            'ltr',
+    skipLink:       '跳转到主要内容',
+    loadingLabel:   '正在执行查询…',
+    resultsReady:   n => `查询完成，${n} 条结果。`,
+    copyCSV:        '复制 CSV',
+    copyRowData:    '复制',
+    copied:         '已复制 ✓',
+  },
+};
+
+// ══════════════════════════════════════════════════════════════════
+// LANGUAGE DETECTION
+// ══════════════════════════════════════════════════════════════════
+const SUPPORTED = Object.keys(LANGS);
+
+function detectLang() {
+  const navLangs = Array.from(navigator.languages || [navigator.language || 'en']);
+  for (const l of navLangs) {
+    if (SUPPORTED.includes(l)) return l;
+    const base = l.split('-')[0];
+    const match = SUPPORTED.find(s => s === base || s.startsWith(base + '-'));
+    if (match) return match;
+  }
+  return 'en';
+}
+
+// ══════════════════════════════════════════════════════════════════
+// THEME
+// ══════════════════════════════════════════════════════════════════
+const html       = document.documentElement;
+const themeBtn   = document.getElementById('theme-toggle');
+const themeLabel = document.getElementById('theme-label');
+const themeIcon  = document.getElementById('theme-icon');
+
+// Déclaré ici pour être accessible par applyTheme dès son premier appel
+let currentLang = 'en';
+
+let isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+applyTheme(isDark);
+
+themeBtn.addEventListener('click', () => {
+  isDark = !isDark;
+  applyTheme(isDark);
+});
+
+// Support touche Espace/Entrée sur le bouton switch
+themeBtn.addEventListener('keydown', e => {
+  if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); themeBtn.click(); }
+});
+
+function applyTheme(dark) {
+  html.dataset.theme = dark ? 'dark' : 'light';
+  themeBtn.setAttribute('aria-checked', dark ? 'false' : 'true');
+  const t = LANGS[currentLang] || LANGS.en;
+  themeLabel.textContent = dark ? t.themeLight : t.themeDark;
+  themeIcon.textContent  = dark ? '☀️' : '🌙';
+  // Mise à jour de l'aria-label du bouton
+  themeBtn.setAttribute('aria-label',
+    `${dark ? t.themeLight : t.themeDark} — toggle color theme`);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// TRANSLATIONS
+// ══════════════════════════════════════════════════════════════════
+function applyLang(lang) {
+  currentLang = lang;
+  const t = LANGS[lang] || LANGS.en;
+  const dir = t.dir || 'ltr';
+
+  html.lang = lang;
+  html.dir  = dir;
+  document.body.dir = dir;
+
+  // Skip link
+  const skipLink = document.getElementById('skip-link');
+  if (skipLink) skipLink.textContent = t.skipLink || 'Skip to main content';
+
+  document.getElementById('hdr-subtitle').textContent       = t.subtitle;
+  document.getElementById('ph-params').textContent          = t.panelParams;
+  document.getElementById('lbl-record').textContent         = t.labelRecord;
+  document.getElementById('record').placeholder             = t.placeholderRec;
+  document.getElementById('lbl-class').textContent          = t.labelClass;
+  document.getElementById('lbl-type').textContent           = t.labelType;
+  document.getElementById('lbl-timeout').textContent        = t.labelTimeout;
+  document.getElementById('lbl-dns').textContent            = t.labelDns;
+  document.getElementById('tab-default').textContent        = t.tabDefault;
+  document.getElementById('tab-preset').textContent         = t.tabPreset;
+  document.getElementById('tab-custom').textContent         = t.tabCustom;
+  document.getElementById('default-dns-hint').textContent   = t.defaultHint;
+  document.getElementById('deselect-all').textContent       = t.deselect;
+  document.getElementById('custom-dns').placeholder         = t.customPlaceholder;
+  document.getElementById('custom-dns-hint').textContent    = t.customHint;
+  document.getElementById('btn-send-label').textContent     = t.btnSend;
+  document.getElementById('ph-results').textContent         = t.panelResults;
+
+  // Mettre à jour aria-label du sélecteur de langue
+  document.getElementById('lang-select-label').textContent =
+    dir === 'rtl' ? 'اللغة' : 'Language';
+
+  applyTheme(isDark);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// INIT LANGUAGE SELECTOR
+// ══════════════════════════════════════════════════════════════════
+const langSel  = document.getElementById('lang-select');
+const initLang = detectLang();
+langSel.value  = SUPPORTED.includes(initLang) ? initLang : 'en';
+applyLang(langSel.value);
+
+langSel.addEventListener('change', () => applyLang(langSel.value));
+
+// ══════════════════════════════════════════════════════════════════
+// DNS PRESETS
+// ══════════════════════════════════════════════════════════════════
+const DNS_PRESETS = [
+  { ip:'1.1.1.1',                name:'Cloudflare' },
+  { ip:'1.0.0.1',                name:'Cloudflare' },
+  { ip:'2606:4700:4700::1111',   name:'Cloudflare' },
+  { ip:'2606:4700:4700::1001',   name:'Cloudflare' },
+  { ip:'8.8.8.8',                name:'Google' },
+  { ip:'8.8.4.4',                name:'Google' },
+  { ip:'2001:4860:4860::8888',   name:'Google' },
+  { ip:'2001:4860:4860::8844',   name:'Google' },
+  { ip:'9.9.9.9',                name:'Quad9 Secure' },
+  { ip:'2620:fe::fe',            name:'Quad9 Secure' },
+  { ip:'208.67.222.222',         name:'OpenDNS' },
+  { ip:'208.67.220.220',         name:'OpenDNS' },
+  { ip:'2620:0:ccc::2',          name:'OpenDNS' },
+  { ip:'2620:0:ccd::2',          name:'OpenDNS' },
+  { ip:'94.140.14.14',           name:'AdGuard' },
+  { ip:'94.140.15.15',           name:'AdGuard' },
+  { ip:'2a10:50c0::ad1:ff',      name:'AdGuard' },
+  { ip:'2a10:50c0::ad2:ff',      name:'AdGuard' },
+  { ip:'86.54.11.1',             name:'DNS4EU' },
+  { ip:'86.54.11.201',           name:'DNS4EU' },
+  { ip:'2a13:1001::86:54:11:1',  name:'DNS4EU' },
+  { ip:'2a13:1001::86:54:11:201',name:'DNS4EU' },
+  { ip:'4.2.2.1',                name:'Level3' },
+  { ip:'4.2.2.2',                name:'Level3' },
+  { ip:'156.154.70.1',           name:'Ultra' },
+  { ip:'156.154.71.1',           name:'Ultra' },
+  { ip:'216.146.35.35',          name:'Dyn' },
+  { ip:'216.146.36.36',          name:'Dyn' },
+];
+
+const grid = document.getElementById('preset-grid');
+DNS_PRESETS.forEach((s, i) => {
+  const item = document.createElement('label');
+  item.className = 'dns-check-item';
+  item.dataset.index = i;
+  // aria-label complet pour le lecteur d'écran
+  item.setAttribute('aria-label', `${s.name} — ${s.ip}`);
+  item.innerHTML = `
+    <input type="radio" name="dns-preset" value="${s.ip}"
+           aria-label="${s.name} ${s.ip} UDP">
+    <div class="dns-radio-dot" aria-hidden="true"></div>
+    <div class="dns-item-info">
+      <div class="dns-item-ip">${s.ip}</div>
+      <div class="dns-item-name">${s.name} · UDP</div>
+    </div>`;
+  item.querySelector('input').addEventListener('change', function() {
+    grid.querySelectorAll('label').forEach(l => l.classList.remove('checked'));
+    if (this.checked) item.classList.add('checked');
+  });
+  grid.appendChild(item);
+});
+
+// ── TABS (keyboard navigation WCAG 2.1 Pattern) ──────────────────
+let activeTab = 'default';
+const tabs = Array.from(document.querySelectorAll('.dns-tab'));
+
+tabs.forEach(btn => {
+  btn.addEventListener('click', () => activateTab(btn.dataset.tab, btn));
+  btn.addEventListener('keydown', e => {
+    const dir = html.dir === 'rtl' ? -1 : 1;
+    let idx = tabs.indexOf(e.currentTarget);
+    if (e.key === 'ArrowRight') { e.preventDefault(); idx = (idx + dir + tabs.length) % tabs.length; tabs[idx].focus(); }
+    if (e.key === 'ArrowLeft')  { e.preventDefault(); idx = (idx - dir + tabs.length) % tabs.length; tabs[idx].focus(); }
+    if (e.key === 'Home') { e.preventDefault(); tabs[0].focus(); }
+    if (e.key === 'End')  { e.preventDefault(); tabs[tabs.length-1].focus(); }
+  });
+});
+
+function activateTab(tabId, btn) {
+  activeTab = tabId;
+  tabs.forEach(b => {
+    b.setAttribute('aria-selected', 'false');
+    b.tabIndex = -1;
+  });
+  document.querySelectorAll('.dns-pane').forEach(p => {
+    p.classList.remove('active');
+    p.hidden = true;
+  });
+  btn.setAttribute('aria-selected', 'true');
+  btn.tabIndex = 0;
+  const pane = document.getElementById('pane-' + tabId);
+  pane.classList.add('active');
+  pane.hidden = false;
+}
+
+// ── DESELECT ──────────────────────────────────────────────────────
+document.getElementById('deselect-all').addEventListener('click', () => {
+  grid.querySelectorAll('input[type=radio]').forEach(r => r.checked = false);
+  grid.querySelectorAll('label').forEach(l => l.classList.remove('checked'));
+});
+
+// ── TIMEOUT ───────────────────────────────────────────────────────
+const slider     = document.getElementById('timeout-slider');
+const timeoutVal = document.getElementById('timeout-val');
+slider.addEventListener('input', () => {
+  const v = slider.value;
+  timeoutVal.textContent = v + ' s';
+  slider.setAttribute('aria-valuenow', v);
+  slider.setAttribute('aria-valuetext', v + ' seconds');
+});
+
+// ── DNS SERVERS ───────────────────────────────────────────────────
+function getDnsServers() {
+  if (activeTab === 'default') return undefined;
+  if (activeTab === 'custom') {
+    const servers = document.getElementById('custom-dns').value
+      .split(/[,\s]+/).map(s => s.trim()).filter(Boolean);
+    return servers.length ? servers : undefined;
+  }
+  const checked = grid.querySelector('input[type=radio]:checked');
+  return checked ? [checked.value] : undefined;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SUBMIT (formulaire)
+// ══════════════════════════════════════════════════════════════════
+const dnsForm  = document.getElementById('dns-form');
+const btn      = document.getElementById('btn-query');
+const hint     = document.getElementById('query-hint');
+const srStatus = document.getElementById('sr-status');
+
+dnsForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const record = document.getElementById('record').value.trim();
+  const t = LANGS[currentLang] || LANGS.en;
+
+  // Validation accessible
+  const recordInput = document.getElementById('record');
+  if (!record) {
+    recordInput.focus();
+    recordInput.setAttribute('aria-invalid', 'true');
+    hint.textContent  = t.warnNoRecord;
+    hint.style.color  = 'var(--warn)';
+    hint.setAttribute('role', 'alert');
+    return;
+  }
+  recordInput.setAttribute('aria-invalid', 'false');
+  hint.textContent = '';
+  hint.removeAttribute('role');
+
+  const dnsServers = getDnsServers();
+  const payload = {
+    class:   document.getElementById('class').value,
+    type:    document.getElementById('type').value,
+    record,
+    timeout: parseInt(slider.value),
+  };
+  if (dnsServers) payload.dnsservers = dnsServers;
+
+  btn.disabled = true;
+  btn.classList.add('loading');
+  btn.setAttribute('aria-busy', 'true');
+  // Annonce lecteur d'écran
+  srStatus.textContent = t.loadingLabel || 'Running query…';
+
+  const t0 = performance.now();
+
+  try {
+    const res = await fetch('/api/v1/dns', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const elapsed = ((performance.now() - t0) / 1000).toFixed(2);
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+    const data = await res.json();
+    renderResults(data, payload, elapsed);
+    const count = data.answers ? data.answers.length : 0;
+    srStatus.textContent = t.resultsReady ? t.resultsReady(count) : `${count} result(s).`;
+  } catch (err) {
+    renderError(err, payload, ((performance.now() - t0) / 1000).toFixed(2));
+    srStatus.textContent = String(err);
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+    btn.removeAttribute('aria-busy');
+  }
+});
+
+// ── Touche Entrée dans le champ record ───────────────────────────
+document.getElementById('record').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); dnsForm.requestSubmit(); }
+});
+
+// ══════════════════════════════════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════════════════════════════════
+function renderResults(data, req, elapsed) {
+  const panel = document.getElementById('results-panel');
+  const body  = document.getElementById('results-body');
+  const t = LANGS[currentLang] || LANGS.en;
+  panel.style.display = 'block';
+
+  const status = (data.status || 'ERROR').toUpperCase();
+  const badgeClass = {
+    SUCCESS:'badge-success', ERROR:'badge-error',
+    TMOUT:'badge-tmout', NXDOMAIN:'badge-nxdomain'
+  }[status] || 'badge-error';
+  const count = data.answers ? data.answers.length : 0;
+  const badgeTxt = status === 'ERROR' ? t.errBadge : status;
+
+  // Raw answer data stored by row index — avoids HTML-encoding issues in data-* attrs
+  const _rowData = [];
+  let content = '';
+  if (status === 'SUCCESS' && count > 0) {
+    content = `<div style="overflow-x:auto">
+      <table class="result-table"
+             aria-label="${esc(req.type)} ${esc(req.record)}"
+             summary="${esc(t.replyCount(count))}">
+        <caption class="visually-hidden">${esc(t.panelResults)} — ${esc(req.class)} ${esc(req.type)} ${esc(req.record)}</caption>
+        <thead><tr>
+          <th scope="col">${t.colRecord}</th>
+          <th scope="col">${t.colType}</th>
+          <th scope="col">${t.colTtl}</th>
+          <th scope="col">${t.colData}</th>
+          <th scope="col" class="td-copy" aria-label="${esc(t.copyRowData)}"></th>
+        </tr></thead>
+        <tbody>${data.answers.map((a, i) => {
+          _rowData.push({ record: a.record, type: a.type, ttl: a.ttl, data: a.data });
+          return `
+          <tr>
+            <td class="td-record">${esc(a.record)}</td>
+            <td class="td-type">${esc(a.type)}</td>
+            <td class="td-ttl">${fmtTTL(a.ttl)}</td>
+            <td class="td-data">${esc(a.data)}</td>
+            <td class="td-copy"><button class="btn-copy btn-copy-row" type="button"
+              data-row="${i}"
+              aria-label="${esc(t.copyRowData)}">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            </button></td>
+          </tr>`;
+        }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  } else if (status === 'NXDOMAIN') {
+    content = `<div class="no-answer" role="status">⊘ &nbsp;${t.nxdomain}</div>`;
+  } else if (status === 'TMOUT') {
+    content = `<div class="no-answer" role="status">⏱ &nbsp;${t.tmout(req.timeout)}</div>`;
+  } else if (status === 'SUCCESS') {
+    content = `<div class="no-answer" role="status">${t.noAnswer}</div>`;
+  } else {
+    content = `<div class="raw-block" role="status">${esc(JSON.stringify(data, null, 2))}</div>`;
+  }
+
+  const csvSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+  const csvBtnHtml = (status === 'SUCCESS' && count > 0)
+    ? `<button class="btn-copy" id="dns-csv-copy-btn" type="button" aria-label="${esc(t.copyCSV)}">
+        ${csvSvg}<span id="dns-csv-copy-label">${esc(t.copyCSV)}</span>
+       </button>`
+    : '';
+  body.innerHTML = `
+    <div class="result-meta" role="region" aria-label="${esc(t.panelResults)}">
+      <span class="badge ${badgeClass}" aria-label="Status: ${badgeTxt}">${badgeTxt}</span>
+      <span class="result-query-str">${esc(req.class)} ${esc(req.type)} ${esc(req.record)}</span>
+      <span class="result-time">${elapsed}s · ${t.replyCount(count)}</span>
+      ${csvBtnHtml}
+    </div>${content}`;
+
+  // Focus sur les résultats (accessibilité clavier)
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  panel.setAttribute('tabindex', '-1');
+  panel.focus({ preventScroll: true });
+
+  // ── Copy CSV button ──────────────────────────────────────────────
+  const csvCopyBtn = document.getElementById('dns-csv-copy-btn');
+  if (csvCopyBtn && data.answers && data.answers.length > 0) {
+    csvCopyBtn.addEventListener('click', () => {
+      const t2 = LANGS[currentLang] || LANGS.en;
+      const hdr = [t2.colRecord, t2.colType, t2.colTtl, t2.colData]
+        .map(csvCell).join('|');
+      const rows = data.answers.map(a =>
+        [a.record, a.type, a.ttl, a.data].map(csvCell).join('|')
+      );
+      navigator.clipboard.writeText([hdr, ...rows].join('\r\n')).then(() => {
+        const lbl = document.getElementById('dns-csv-copy-label');
+        csvCopyBtn.classList.add('copied');
+        if (lbl) lbl.textContent = t2.copied;
+        setTimeout(() => {
+          csvCopyBtn.classList.remove('copied');
+          if (lbl) lbl.textContent = t2.copyCSV;
+        }, 2000);
+      }).catch(() => {});
+    });
+  }
+
+  // ── Per-row copy buttons ─────────────────────────────────────────
+  body.querySelectorAll('.btn-copy-row').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const t2  = LANGS[currentLang] || LANGS.en;
+      const row = _rowData[parseInt(btn.dataset.row, 10)];
+      if (!row) return;
+      navigator.clipboard.writeText(String(row.data)).then(() => {
+        btn.classList.add('copied');
+        setTimeout(() => btn.classList.remove('copied'), 2000);
+      }).catch(() => {});
+    });
+  });
+}
+
+function renderError(err, req, elapsed) {
+  const panel = document.getElementById('results-panel');
+  const body  = document.getElementById('results-body');
+  const t = LANGS[currentLang] || LANGS.en;
+  panel.style.display = 'block';
+  body.innerHTML = `
+    <div class="result-meta">
+      <span class="badge badge-error">${t.errBadge}</span>
+      <span class="result-query-str">${esc(req.record)}</span>
+      <span class="result-time">${elapsed}s</span>
+    </div>
+    <div class="raw-block" role="alert" style="color:var(--err)">${esc(String(err))}</div>`;
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  panel.setAttribute('tabindex', '-1');
+  panel.focus({ preventScroll: true });
+}
+
+const esc = s => String(s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+  .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+function csvCell(v) {
+  const s = String(v == null ? '' : v);
+  return /[,"\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+function fmtTTL(ttl) {
+  if (ttl == null) return '—';
+  if (ttl >= 86400) return (ttl/86400|0)+'d';
+  if (ttl >= 3600)  return (ttl/3600|0)+'h';
+  if (ttl >= 60)    return (ttl/60|0)+'m';
+  return ttl+'s';
+}
+</script>
+</body>
+</html>

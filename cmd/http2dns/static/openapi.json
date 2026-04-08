@@ -1,0 +1,201 @@
+{
+  "openapi": "3.1.0",
+  "jsonSchemaDialect": "https://spec.openapis.org/oas/3.1/dialect/base",
+  "info": {
+    "title": "DNS-over-HTTP API",
+    "version": "1.0.0",
+    "description": "HTTP service allowing DNS queries (A, AAAA, CNAME, MX, …) through a JSON POST request.\n\nThe service accepts a list of DNS servers. If none are provided, the `DNS_SERVERS` environment variable will be used. If it is not set, Google public DNS servers (`8.8.8.8:53`, `8.8.4.4:53`) are used by default."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Local development environment"
+    }
+  ],
+  "tags": [
+    {
+      "name": "DNS",
+      "description": "DNS operations"
+    }
+  ],
+  "paths": {
+    "/api/v1/dns": {
+      "post": {
+        "tags": ["DNS"],
+        "summary": "Perform a DNS query via HTTP POST",
+        "operationId": "dnsQuery",
+        "description": "Sends a JSON request describing a DNS query and returns the DNS response records in JSON format.",
+        "requestBody": {
+          "required": true,
+          "description": "DNS query parameters",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DNSQueryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "DNS response (application status is included in the body)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DNSQueryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DNSQueryResponse"
+                },
+                "examples": {
+                  "invalid": {
+                    "value": {
+                      "status": "ERROR",
+                      "answers": []
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DNSQueryResponse"
+                },
+                "examples": {
+                  "internal": {
+                    "value": {
+                      "status": "ERROR",
+                      "answers": []
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "DNSClass": {
+        "type": "string",
+        "description": "DNS class",
+        "enum": ["IN", "CH", "HS", "CS"]
+      },
+      "DNSType": {
+        "type": "string",
+        "description": "DNS record type",
+        "enum": [
+          "A",
+          "AAAA",
+          "CNAME",
+          "MX",
+          "NS",
+          "PTR",
+          "SOA",
+          "TXT",
+          "SRV",
+          "NAPTR",
+          "OPT",
+          "ANY"
+        ]
+      },
+      "DNSQueryRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["class", "type", "record"],
+        "properties": {
+          "class": {
+            "$ref": "#/components/schemas/DNSClass"
+          },
+          "type": {
+            "$ref": "#/components/schemas/DNSType"
+          },
+          "record": {
+            "type": "string",
+            "description": "DNS name to query",
+            "examples": ["example.com"]
+          },
+          "dnsservers": {
+            "type": "array",
+            "description": "List of DNS servers to query. If omitted, the `DNS_SERVERS` environment variable will be used. If it is not defined, Google public DNS servers will be used as fallback.",
+            "items": {
+              "type": "string",
+              "pattern": "^[^:]+:[0-9]+$"
+            },
+            "examples": [["8.8.8.8:53", "1.1.1.1:53"]]
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "Query timeout in seconds",
+            "default": 5,
+            "minimum": 1,
+            "maximum": 60,
+            "examples": [10]
+          }
+        }
+      },
+      "Answer": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "record": {
+            "type": "string",
+            "description": "Returned DNS record name",
+            "examples": ["example.com"]
+          },
+          "type": {
+            "$ref": "#/components/schemas/DNSType"
+          },
+          "ttl": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0,
+            "description": "Time to live in seconds",
+            "examples": [3600]
+          },
+          "data": {
+            "type": "string",
+            "description": "Record value",
+            "examples": ["93.184.216.34"]
+          }
+        }
+      },
+      "DNSStatus": {
+        "type": "string",
+        "enum": ["SUCCESS", "NXDOMAIN", "ERROR", "TMOUT"]
+      },
+      "DNSQueryResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["status"],
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/DNSStatus"
+          },
+          "answers": {
+            "type": "array",
+            "description": "DNS responses (empty if status ≠ SUCCESS)",
+            "items": {
+              "$ref": "#/components/schemas/Answer"
+            },
+            "default": []
+          }
+        }
+      }
+    },
+    "securitySchemes": {}
+  }
+}
