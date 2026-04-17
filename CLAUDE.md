@@ -83,7 +83,7 @@ bash scripts/linux_build.sh
 # Run (sets LISTEN_ADDR=0.0.0.0:8080)
 bash scripts/linux_run.sh
 
-# Build Docker image → nettools/http2dns:latest
+# Build Docker image → letstool/http2dns:latest
 bash scripts/docker_build.sh
 
 # Run Docker container

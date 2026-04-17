@@ -87,7 +87,7 @@ This runs a two-stage Docker build:
 1. **Builder** — `golang:1.24-alpine` compiles a static binary
 2. **Runtime** — `scratch` image, containing only the binary
 
-The resulting image is tagged `nettools/http2dns:latest`.
+The resulting image is tagged `letstool/http2dns:latest`.
 
 ---
 
@@ -116,7 +116,7 @@ bash scripts/docker_run.sh
 Equivalent to:
 
 ```bash
-docker run -it --rm -p 8080:8080 -e LISTEN_ADDR=0.0.0.0:8080 nettools/http2dns:latest
+docker run -it --rm -p 8080:8080 -e LISTEN_ADDR=0.0.0.0:8080 letstool/http2dns:latest
 ```
 
 Once running, the service is available at [http://localhost:8080](http://localhost:8080).
