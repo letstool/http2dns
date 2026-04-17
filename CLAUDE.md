@@ -26,7 +26,7 @@ The server accepts `POST /api/v1/dns` requests describing a DNS query and return
 │       ├── main.go               # Entire application — single file
 │       └── static/
 │           ├── favicon.png       # Embedded at build time
-│           ├── index.html        # Embedded web UI (dark/light, 13 languages)
+│           ├── index.html        # Embedded web UI (dark/light, 15 languages)
 │           └── openapi.json      # Embedded OpenAPI spec (generated from swagger.yaml)
 ├── scripts/
 │   ├── 000_init.sh               # go mod tidy
@@ -38,6 +38,7 @@ The server accepts `POST /api/v1/dns` requests describing a DNS query and return
 │   ├── windows_build.cmd         # Native build on Windows
 │   └── windows_run.cmd           # Run binary on Windows
 ├── go.mod
+├── go.sum
 ├── LICENSE                       # MIT
 ├── README.md
 └── CLAUDE.md                     # This file
@@ -82,7 +83,7 @@ bash scripts/linux_build.sh
 # Run (sets LISTEN_ADDR=0.0.0.0:8080)
 bash scripts/linux_run.sh
 
-# Build Docker image → letstool/http2dns:latest
+# Build Docker image → nettools/http2dns:latest
 bash scripts/docker_build.sh
 
 # Run Docker container
@@ -136,8 +137,8 @@ Content-Type: application/json
 
 The UI is a self-contained single-file HTML/JS/CSS application embedded in the binary.
 
-- **Themes**: dark and light, switchable via a toggle button.
-- **Languages**: 13 locales built in — Arabic (`ar`), Bengali (`bn`), German (`de`), English (`en`), Spanish (`es`), French (`fr`), Hindi (`hi`), Indonesian (`id`), Japanese (`ja`), Korean (`ko`), Russian (`ru`), Urdu (`ur`), Vietnamese (`vi`). Language is selected from a dropdown.
+- **Themes**: dark and light, switchable via a toggle button; preference is persisted in `localStorage`.
+- **Languages**: 15 locales built in — Arabic (`ar`), Bengali (`bn`), Chinese (`zh`), German (`de`), English (`en`), Spanish (`es`), French (`fr`), Hindi (`hi`), Indonesian (`id`), Japanese (`ja`), Korean (`ko`), Portuguese (`pt`), Russian (`ru`), Urdu (`ur`), Vietnamese (`vi`). Language is selected from a dropdown and persisted in `localStorage`.
 - **RTL support**: Arabic and Urdu automatically switch the layout to right-to-left.
 - The UI calls `POST /api/v1/dns` and renders results in a table.
 - The OpenAPI spec is also served at `/openapi.json` for use with tools such as Swagger UI or Postman.

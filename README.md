@@ -10,7 +10,7 @@ Built in Go, it accepts a `POST` request with a DNS query description and return
 
 ![http2dns Web UI](docs/screenshot.png)
 
-> The embedded web UI (served at `/`) provides an interactive form to issue DNS queries and inspect responses directly in the browser. It supports **dark and light themes** and is fully translated into **13 languages**.
+> The embedded web UI (served at `/`) provides an interactive form to issue DNS queries and inspect responses directly in the browser. It supports **dark and light themes** and is fully translated into **15 languages**.
 
 ---
 
@@ -26,7 +26,7 @@ It is **not maintained**: no bug fixes, dependency updates, or new features are 
 This project is licensed under the **MIT License** — see the [`LICENSE`](LICENSE) file for details.
 
 ```
-MIT License — Copyright (c) 2026 letstool
+MIT License — Copyright (c) 2026 jctools
 ```
 
 ---
@@ -36,7 +36,7 @@ MIT License — Copyright (c) 2026 letstool
 - Single static binary — no external runtime dependencies
 - Embedded web UI and OpenAPI 3.1 specification (`/openapi.json`)
 - Web UI available in **dark and light mode**, switchable at runtime via a toggle
-- Web UI fully translated into **13 languages**: Arabic, Bengali, Hindi, Indonesian, Korean, Urdu, Vietnamese, German, English, Spanish, French, Japanese, Russian
+- Web UI fully translated into **15 languages**: Arabic, Bengali, Chinese, German, English, Spanish, French, Hindi, Indonesian, Japanese, Korean, Portuguese, Russian, Urdu, Vietnamese
 - Supports **A, AAAA, CNAME, MX, NS, PTR, SOA, TXT, SRV, NAPTR, OPT, ANY** record types
 - DNS classes: **IN, CH, HS, CS**
 - Automatic **UDP → TCP fallback** for truncated responses (large TXT records, etc.)
@@ -87,7 +87,7 @@ This runs a two-stage Docker build:
 1. **Builder** — `golang:1.24-alpine` compiles a static binary
 2. **Runtime** — `scratch` image, containing only the binary
 
-The resulting image is tagged `letstool/http2dns:latest`.
+The resulting image is tagged `nettools/http2dns:latest`.
 
 ---
 
@@ -116,7 +116,7 @@ bash scripts/docker_run.sh
 Equivalent to:
 
 ```bash
-docker run -it --rm -p 8080:8080 -e LISTEN_ADDR=0.0.0.0:8080 letstool/http2dns:latest
+docker run -it --rm -p 8080:8080 -e LISTEN_ADDR=0.0.0.0:8080 nettools/http2dns:latest
 ```
 
 Once running, the service is available at [http://localhost:8080](http://localhost:8080).
@@ -214,7 +214,7 @@ Each `Answer` object:
 ```bash
 curl -s -X POST http://localhost:8080/api/v1/dns \
   -H "Content-Type: application/json" \
-  -d '{"class":"IN","type":"MX","record":"gmail.com"}' | jq
+  -d '{"class":"IN","type":"MX","record":"gmail.com"}' | jq .
 ```
 
 ```json

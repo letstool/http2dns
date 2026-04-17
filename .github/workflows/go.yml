@@ -11,25 +11,45 @@ permissions:
 jobs:
   build:
     name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
 
     strategy:
       matrix:
         include:
           - goos: linux
             goarch: amd64
+            runner: ubuntu-latest
             artifact: http2dns-linux-amd64
             binary: http2dns
+            static: true
 
           - goos: linux
             goarch: arm64
+            runner: ubuntu-latest
             artifact: http2dns-linux-arm64
             binary: http2dns
+            static: true
 
           - goos: windows
             goarch: amd64
+            runner: ubuntu-latest
             artifact: http2dns-windows-amd64
             binary: http2dns.exe
+            static: true
+
+          - goos: darwin
+            goarch: amd64
+            runner: macos-latest
+            artifact: http2dns-darwin-amd64
+            binary: http2dns
+            static: false
+
+          - goos: darwin
+            goarch: arm64
+            runner: macos-latest
+            artifact: http2dns-darwin-arm64
+            binary: http2dns
+            static: false
 
     steps:
       - name: Checkout
@@ -44,7 +64,8 @@ jobs:
       - name: Verify dependencies
         run: go mod verify
 
-      - name: Build
+      - name: Build (static)
+        if: matrix.static == true
         env:
           CGO_ENABLED: "0"
           GOOS: ${{ matrix.goos }}
@@ -53,6 +74,20 @@ jobs:
           go build \
             -trimpath \
             -ldflags="-extldflags -static -s -w -X main.version=${{ github.ref_name }}" \
+            -tags netgo \
+            -o out/${{ matrix.binary }} \
+            ./cmd/http2dns
+
+      - name: Build (dynamic)
+        if: matrix.static == false
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          go build \
+            -trimpath \
+            -ldflags="-s -w -X main.version=${{ github.ref_name }}" \
             -tags netgo \
             -o out/${{ matrix.binary }} \
             ./cmd/http2dns
