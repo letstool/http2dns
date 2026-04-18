@@ -137,8 +137,8 @@ Content-Type: application/json
 
 The UI is a self-contained single-file HTML/JS/CSS application embedded in the binary.
 
-- **Themes**: dark and light, switchable via a toggle button; preference is persisted in `localStorage`.
-- **Languages**: 15 locales built in — Arabic (`ar`), Bengali (`bn`), Chinese (`zh`), German (`de`), English (`en`), Spanish (`es`), French (`fr`), Hindi (`hi`), Indonesian (`id`), Japanese (`ja`), Korean (`ko`), Portuguese (`pt`), Russian (`ru`), Urdu (`ur`), Vietnamese (`vi`). Language is selected from a dropdown and persisted in `localStorage`.
+- **Themes**: dark and light, switchable via a toggle button.
+- **Languages**: 15 locales built in — Arabic (`ar`), Bengali (`bn`), Chinese (`zh`), German (`de`), English (`en`), Spanish (`es`), French (`fr`), Hindi (`hi`), Indonesian (`id`), Japanese (`ja`), Korean (`ko`), Portuguese (`pt`), Russian (`ru`), Urdu (`ur`), Vietnamese (`vi`). Language is selected from a dropdown.
 - **RTL support**: Arabic and Urdu automatically switch the layout to right-to-left.
 - The UI calls `POST /api/v1/dns` and renders results in a table.
 - The OpenAPI spec is also served at `/openapi.json` for use with tools such as Swagger UI or Postman.
